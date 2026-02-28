@@ -75,7 +75,7 @@ const Hero = () => {
                     animate={{ opacity: 1 }}
                     transition={{ duration: 1, delay: 0.8 }}
                     className="flex gap-8 mt-4"
-                    style={{ marginTop: '4rem', opacity: 0.7 }}
+                    style={{ marginTop: '4rem', opacity: 0.7, flexWrap: 'wrap', justifyContent: 'center' }}
                 >
                     <div className="flex items-center gap-2 text-sm font-bold">
                         <Shield size={18} className="text-primary" /> Verified Landlords
