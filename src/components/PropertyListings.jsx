@@ -10,12 +10,23 @@ const PropertyListings = () => {
     const auth = getAuth();
     const [properties, setProperties] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [showAdvanced, setShowAdvanced] = useState(false);
     const [filters, setFilters] = useState({
         minPrice: '',
         maxPrice: '',
         type: 'all',
-        location: 'Ibadan'
+        location: '',
+        amenities: [],
+        sortBy: 'newest'
     });
+
+    const amenityOptions = [
+        { id: 'wifi', label: 'WiFi' },
+        { id: 'generator', label: 'Generator' },
+        { id: 'water', label: 'Running Water' },
+        { id: 'security', label: 'Security' },
+        { id: 'parking', label: 'Parking' }
+    ];
 
     useEffect(() => {
         const db = getFirestore();
@@ -41,45 +52,81 @@ const PropertyListings = () => {
         setFilters(prev => ({ ...prev, [name]: value }));
     };
 
-    const filteredProperties = properties.filter((prop) => {
-        // Requirement 4: Only show approved properties from verified landlords
-        if (prop.approvalStatus !== 'approved' || prop.landlordVerified !== true) return false;
+    const handleAmenityToggle = (amenityId) => {
+        setFilters(prev => {
+            const newAmenities = prev.amenities.includes(amenityId)
+                ? prev.amenities.filter(id => id !== amenityId)
+                : [...prev.amenities, amenityId];
+            return { ...prev, amenities: newAmenities };
+        });
+    };
 
-        const matchType = filters.type === 'all' || prop.type === filters.type;
-        const matchLocation = prop.location.toLowerCase().includes(filters.location.toLowerCase());
+    const sortedAndFilteredProperties = properties
+        .filter((prop) => {
+            // Requirement: Only show approved properties from verified landlords
+            if (prop.approvalStatus !== 'approved' || prop.landlordVerified !== true) return false;
 
-        // Price filtering
-        const price = Number(prop.price);
-        const minP = filters.minPrice ? Number(filters.minPrice) : 0;
-        const maxP = filters.maxPrice ? Number(filters.maxPrice) : Infinity;
-        const matchPrice = price >= minP && price <= maxP;
+            const matchType = filters.type === 'all' || prop.type === filters.type;
+            const matchLocation = prop.location.toLowerCase().includes(filters.location.toLowerCase());
 
-        return matchType && matchLocation && matchPrice;
-    });
+            // Price filtering
+            const price = Number(prop.price);
+            const minP = filters.minPrice ? Number(filters.minPrice) : 0;
+            const maxP = filters.maxPrice ? Number(filters.maxPrice) : Infinity;
+            const matchPrice = price >= minP && price <= maxP;
+
+            // Amenities filtering
+            const matchAmenities = filters.amenities.every(amenity =>
+                prop.amenities && prop.amenities.includes(amenity)
+            );
+
+            return matchType && matchLocation && matchPrice && matchAmenities;
+        })
+        .sort((a, b) => {
+            if (filters.sortBy === 'priceLow') return a.price - b.price;
+            if (filters.sortBy === 'priceHigh') return b.price - a.price;
+            if (filters.sortBy === 'newest') return new Date(b.createdAt) - new Date(a.createdAt);
+            return 0;
+        });
 
     if (loading) {
-        return <div className="text-center py-8">Loading properties...</div>;
+        return <div className="text-center py-12">
+            <div className="loading-spinner mb-4"></div>
+            <p className="text-light">Finding properties...</p>
+        </div>;
     }
 
     return (
         <div className="mt-8">
             {/* Filters Section */}
-            <div className="card mb-8">
-                <h3 className="mb-4">Filter Listings</h3>
-                <div className="flex gap-4" style={{ flexWrap: 'wrap' }}>
-                    <div className="form-group" style={{ flex: '1 1 200px', marginBottom: 0 }}>
-                        <label className="form-label text-sm">Location</label>
-                        <input
-                            type="text"
-                            name="location"
-                            className="form-input"
-                            placeholder="Search area in Ibadan..."
-                            value={filters.location}
-                            onChange={handleFilterChange}
-                        />
+            <div className="card mb-8 shadow-sm">
+                <div className="flex justify-between items-center mb-6">
+                    <h3 className="flex items-center gap-2 m-0"><Tag size={20} color="var(--primary-color)" /> Filter Listings</h3>
+                    <button
+                        className="btn btn-secondary text-sm"
+                        onClick={() => setShowAdvanced(!showAdvanced)}
+                    >
+                        {showAdvanced ? 'Simple Search' : 'Advanced Filters'}
+                    </button>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                    <div className="form-group">
+                        <label className="form-label text-sm fw-bold">Location</label>
+                        <div className="relative">
+                            <MapPin size={16} className="absolute left-3 top-3 text-light" />
+                            <input
+                                type="text"
+                                name="location"
+                                className="form-input ps-10"
+                                placeholder="Search area..."
+                                value={filters.location}
+                                onChange={handleFilterChange}
+                            />
+                        </div>
                     </div>
-                    <div className="form-group" style={{ flex: '1 1 150px', marginBottom: 0 }}>
-                        <label className="form-label text-sm">Property Type</label>
+                    <div className="form-group">
+                        <label className="form-label text-sm fw-bold">Property Type</label>
                         <select
                             name="type"
                             className="form-input"
@@ -93,69 +140,154 @@ const PropertyListings = () => {
                             <option value="hostel">Hostel Space</option>
                         </select>
                     </div>
-                    <div className="form-group" style={{ flex: '1 1 120px', marginBottom: 0 }}>
-                        <label className="form-label text-sm">Min Price</label>
-                        <input
-                            type="number"
-                            name="minPrice"
-                            className="form-input"
-                            placeholder="0"
-                            value={filters.minPrice}
-                            onChange={handleFilterChange}
-                        />
+                    <div className="form-group">
+                        <label className="form-label text-sm fw-bold">Price Range (₦)</label>
+                        <div className="flex items-center gap-2">
+                            <input
+                                type="number"
+                                name="minPrice"
+                                className="form-input"
+                                placeholder="Min"
+                                value={filters.minPrice}
+                                onChange={handleFilterChange}
+                            />
+                            <span className="text-light">-</span>
+                            <input
+                                type="number"
+                                name="maxPrice"
+                                className="form-input"
+                                placeholder="Max"
+                                value={filters.maxPrice}
+                                onChange={handleFilterChange}
+                            />
+                        </div>
                     </div>
-                    <div className="form-group" style={{ flex: '1 1 120px', marginBottom: 0 }}>
-                        <label className="form-label text-sm">Max Price</label>
-                        <input
-                            type="number"
-                            name="maxPrice"
+                    <div className="form-group">
+                        <label className="form-label text-sm fw-bold">Sort By</label>
+                        <select
+                            name="sortBy"
                             className="form-input"
-                            placeholder="Any"
-                            value={filters.maxPrice}
+                            value={filters.sortBy}
                             onChange={handleFilterChange}
-                        />
+                        >
+                            <option value="newest">Newest First</option>
+                            <option value="priceLow">Price: Low to High</option>
+                            <option value="priceHigh">Price: High to Low</option>
+                        </select>
                     </div>
                 </div>
+
+                {showAdvanced && (
+                    <div className="mt-6 pt-6 border-top">
+                        <label className="form-label text-sm fw-bold mb-3 d-block">Required Amenities</label>
+                        <div className="flex flex-wrap gap-4">
+                            {amenityOptions.map(option => (
+                                <label key={option.id} className="flex items-center gap-2 cursor-pointer bg-light p-2 rounded-lg border hover:border-primary transition-all">
+                                    <input
+                                        type="checkbox"
+                                        checked={filters.amenities.includes(option.id)}
+                                        onChange={() => handleAmenityToggle(option.id)}
+                                        className="form-checkbox h-4 w-4 text-primary rounded"
+                                    />
+                                    <span className="text-sm">{option.label}</span>
+                                </label>
+                            ))}
+                        </div>
+                    </div>
+                )}
+            </div>
+
+            {/* Results Header */}
+            <div className="flex justify-between items-center mb-6">
+                <p className="text-light m-0">Found <strong>{sortedAndFilteredProperties.length}</strong> properties matching your criteria</p>
             </div>
 
             {/* Listings Section */}
-            <div className="flex gap-8" style={{ flexWrap: 'wrap' }}>
-                {filteredProperties.length === 0 ? (
-                    <div className="w-full text-center py-8 text-light">No properties found matching your criteria.</div>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                {sortedAndFilteredProperties.length === 0 ? (
+                    <div className="col-span-full card text-center py-12">
+                        <div className="mb-4 text-light">
+                            <Home size={48} className="mx-auto opacity-20" />
+                        </div>
+                        <h3>No matches found</h3>
+                        <p className="text-light">Try adjusting your filters or location search.</p>
+                        <button
+                            className="btn btn-secondary mt-4"
+                            onClick={() => setFilters({
+                                minPrice: '',
+                                maxPrice: '',
+                                type: 'all',
+                                location: '',
+                                amenities: [],
+                                sortBy: 'newest'
+                            })}
+                        >
+                            Reset All Filters
+                        </button>
+                    </div>
                 ) : (
-                    filteredProperties.map((prop) => (
-                        <div key={prop.id} className="card" style={{ flex: '1 1 300px', padding: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+                    sortedAndFilteredProperties.map((prop) => (
+                        <div key={prop.id} className="card property-card group" style={{ padding: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
 
-                            {/* Image Carousel / Thumbnail logic */}
-                            <div style={{ height: '200px', backgroundColor: '#e5e7eb', position: 'relative' }}>
+                            {/* Image Section */}
+                            <div style={{ height: '220px', backgroundColor: '#f3f4f6', position: 'relative', overflow: 'hidden' }}>
                                 {prop.images && prop.images.length > 0 ? (
-                                    <img src={prop.images[0]} alt={prop.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                    <img
+                                        src={prop.images[0]}
+                                        alt={prop.title}
+                                        className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+                                    />
                                 ) : (
-                                    <div className="flex items-center justify-center h-full w-full text-light">No Image</div>
+                                    <div className="flex flex-col items-center justify-center h-full w-full text-light">
+                                        <Home size={40} className="mb-2 opacity-10" />
+                                        <span className="text-xs uppercase fw-bold">No Preview Image</span>
+                                    </div>
                                 )}
-                                <div style={{ position: 'absolute', top: '10px', right: '10px', backgroundColor: 'rgba(0,0,0,0.6)', color: 'white', padding: '4px 8px', borderRadius: '4px', fontSize: '0.8rem', fontWeight: 'bold' }}>
-                                    ₦{prop.price.toLocaleString()} / yr
+                                <div className="absolute top-4 right-4 bg-white/90 backdrop-blur-sm text-dark px-3 py-1.5 rounded-full text-sm fw-bold shadow-sm">
+                                    ₦{Number(prop.price).toLocaleString()} / yr
                                 </div>
+                                {prop.isVerfied && (
+                                    <div className="absolute top-4 left-4 bg-primary text-dark px-2 py-1 rounded-md text-[10px] fw-bold shadow-sm flex items-center gap-1">
+                                        <ShieldCheck size={12} /> VERIFIED
+                                    </div>
+                                )}
                             </div>
 
                             {/* Property Details */}
-                            <div style={{ padding: '1.5rem', flexGrow: 1, display: 'flex', flexDirection: 'column' }}>
-                                <h3 className="mb-2" style={{ fontSize: '1.25rem' }}>{prop.title}</h3>
-
-                                <div className="flex flex-col gap-2 mb-4" style={{ color: 'var(--text-light)', fontSize: '0.9rem' }}>
-                                    <div className="flex items-center gap-2"><MapPin size={16} /> {prop.location}</div>
-                                    <div className="flex items-center gap-2" style={{ textTransform: 'capitalize' }}><Home size={16} /> {prop.type}</div>
-                                    {prop.video && <div className="flex items-center gap-2" style={{ color: 'var(--primary-color)' }}><Video size={16} /> Virtual Tour Available</div>}
+                            <div className="p-5 flex-grow flex flex-col">
+                                <div className="flex justify-between items-start mb-2">
+                                    <h3 className="m-0 text-lg hover:text-primary transition-colors cursor-pointer">{prop.title}</h3>
+                                    <span className="text-[10px] bg-gray-100 text-gray-600 px-2 py-1 rounded uppercase fw-bold tracking-wider">
+                                        {prop.type}
+                                    </span>
                                 </div>
 
-                                <p style={{ fontSize: '0.9rem', marginBottom: '1.5rem', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+                                <div className="flex flex-col gap-2 mb-4 text-light text-sm">
+                                    <div className="flex items-center gap-2"><MapPin size={14} className="text-primary" /> {prop.location}</div>
+                                    {prop.video && <div className="flex items-center gap-2 text-primary fw-bold text-[11px]"><Video size={14} /> VIRTUAL TOUR AVAILABLE</div>}
+                                </div>
+
+                                {prop.amenities && prop.amenities.length > 0 && (
+                                    <div className="flex flex-wrap gap-1.5 mb-4">
+                                        {prop.amenities.slice(0, 3).map(amenity => (
+                                            <span key={amenity} className="text-[10px] bg-primary/10 text-primary-dark px-2 py-0.5 rounded-full capitalize">
+                                                • {amenity}
+                                            </span>
+                                        ))}
+                                        {prop.amenities.length > 3 && (
+                                            <span className="text-[10px] text-light">+{prop.amenities.length - 3} more</span>
+                                        )}
+                                    </div>
+                                )}
+
+                                <p className="text-sm line-clamp-2 mb-6 text-gray-600 leading-relaxed">
                                     {prop.description}
                                 </p>
 
                                 <div className="mt-auto">
                                     {!auth.currentUser ? (
                                         <button
-                                            className="btn btn-primary w-full"
+                                            className="btn btn-secondary w-full"
                                             onClick={() => alert("Please login as a student to book properties.")}
                                         >
                                             Login to Book
@@ -183,7 +315,7 @@ const PropertyListings = () => {
                                             onClose={() => {
                                                 console.log("Payment window closed");
                                             }}
-                                            btnText="Pay & Request Booking"
+                                            btnText="Secure This Home"
                                         />
                                     )}
                                 </div>

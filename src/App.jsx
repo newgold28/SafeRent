@@ -9,6 +9,7 @@ import Signup from './pages/Signup';
 import StudentDashboard from './pages/StudentDashboard';
 import LandlordDashboard from './pages/LandlordDashboard';
 import AdminDashboard from './pages/AdminDashboard';
+import Settings from './pages/Settings';
 import './index.css';
 
 const PageWrapper = ({ children }) => (
@@ -34,6 +35,7 @@ const AnimatedRoutes = () => {
         <Route path="/student-dashboard" element={<PageWrapper><StudentDashboard /></PageWrapper>} />
         <Route path="/landlord-dashboard" element={<PageWrapper><LandlordDashboard /></PageWrapper>} />
         <Route path="/admin" element={<PageWrapper><AdminDashboard /></PageWrapper>} />
+        <Route path="/settings" element={<PageWrapper><Settings /></PageWrapper>} />
       </Routes>
     </AnimatePresence>
   );

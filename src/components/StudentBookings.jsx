@@ -15,14 +15,19 @@ const StudentBookings = () => {
 
         const q = query(
             collection(db, 'bookings'),
-            where('studentId', '==', user.uid),
-            orderBy('createdAt', 'desc')
+            where('studentId', '==', user.uid)
         );
 
         const unsubscribe = onSnapshot(q, (snapshot) => {
             const bookingData = [];
             snapshot.forEach((doc) => {
                 bookingData.push({ id: doc.id, ...doc.data() });
+            });
+            // Client-side sort: newest first
+            bookingData.sort((a, b) => {
+                const timeA = a.createdAt?.seconds || new Date(a.createdAt).getTime() / 1000 || 0;
+                const timeB = b.createdAt?.seconds || new Date(b.createdAt).getTime() / 1000 || 0;
+                return timeB - timeA;
             });
             setBookings(bookingData);
             setLoading(false);

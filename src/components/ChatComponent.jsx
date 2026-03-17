@@ -3,6 +3,7 @@ import { getFirestore, collection, query, where, onSnapshot, orderBy } from 'fir
 import { getAuth } from 'firebase/auth';
 import { chatService } from '../services/firebase';
 import { Send, User } from 'lucide-react';
+import { createNotification } from '../services/notifications';
 
 const ChatComponent = ({ receiverId, propertyId, receiverName = "User" }) => {
     const [messages, setMessages] = useState([]);
@@ -20,8 +21,7 @@ const ChatComponent = ({ receiverId, propertyId, receiverName = "User" }) => {
         // Note: For a real app, you might want a more complex query or a 'conversations' collection
         const q = query(
             collection(db, 'messages'),
-            where('propertyId', '==', propertyId),
-            orderBy('timestamp', 'asc')
+            where('propertyId', '==', propertyId)
         );
 
         const unsubscribe = onSnapshot(q, (snapshot) => {
@@ -36,6 +36,14 @@ const ChatComponent = ({ receiverId, propertyId, receiverName = "User" }) => {
                     msgs.push({ id: doc.id, ...data });
                 }
             });
+
+            // Client-side sort: oldest first for chat flow
+            msgs.sort((a, b) => {
+                const timeA = a.timestamp?.seconds || new Date(a.timestamp).getTime() / 1000 || 0;
+                const timeB = b.timestamp?.seconds || new Date(b.timestamp).getTime() / 1000 || 0;
+                return timeA - timeB;
+            });
+
             setMessages(msgs);
             setLoading(false);
         }, (error) => {
@@ -64,6 +72,16 @@ const ChatComponent = ({ receiverId, propertyId, receiverName = "User" }) => {
                 propertyId,
                 newMessage
             );
+
+            // Notify the receiver
+            await createNotification(
+                receiverId,
+                "New Message",
+                `You have a new message regarding property ${propertyId.substring(0, 8)}...`,
+                'new_message',
+                propertyId
+            );
+
             setNewMessage('');
         } catch (error) {
             alert("Failed to send message.");

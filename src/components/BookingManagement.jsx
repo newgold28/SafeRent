@@ -2,11 +2,15 @@ import React, { useState, useEffect } from 'react';
 import { getFirestore, collection, query, where, onSnapshot, orderBy } from 'firebase/firestore';
 import { bookingService } from '../services/firebase';
 import { getAuth } from 'firebase/auth';
-import { Clock, CheckCircle, XCircle } from 'lucide-react';
+import { Clock, CheckCircle, XCircle, MessageSquare, X, Home } from 'lucide-react';
+import { createNotification } from '../services/notifications';
+import { motion, AnimatePresence } from 'framer-motion';
+import ChatComponent from './ChatComponent';
 
-const BookingManagement = () => {
+const BookingManagement = ({ properties = [] }) => {
     const [bookings, setBookings] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [activeChat, setActiveChat] = useState(null); // { studentId, propertyId, studentName }
     const auth = getAuth();
     const db = getFirestore();
 
@@ -17,14 +21,19 @@ const BookingManagement = () => {
         // Listen for bookings belonging to this landlord
         const q = query(
             collection(db, 'bookings'),
-            where('landlordId', '==', user.uid),
-            orderBy('createdAt', 'desc')
+            where('landlordId', '==', user.uid)
         );
 
         const unsubscribe = onSnapshot(q, (snapshot) => {
             const bookingData = [];
             snapshot.forEach((doc) => {
                 bookingData.push({ id: doc.id, ...doc.data() });
+            });
+            // Client-side sort: newest first
+            bookingData.sort((a, b) => {
+                const timeA = a.createdAt?.seconds || new Date(a.createdAt).getTime() / 1000 || 0;
+                const timeB = b.createdAt?.seconds || new Date(b.createdAt).getTime() / 1000 || 0;
+                return timeB - timeA;
             });
             setBookings(bookingData);
             setLoading(false);
@@ -36,10 +45,19 @@ const BookingManagement = () => {
         return () => unsubscribe();
     }, [auth]);
 
-    const handleAction = async (bookingId, status) => {
+    const handleAction = async (bookingId, status, studentId) => {
         try {
             await bookingService.updateBookingStatus(bookingId, status);
-            // Optionally, we could dispatch a notification here
+
+            // Notify the student
+            await createNotification(
+                studentId,
+                `Booking ${status.charAt(0).toUpperCase() + status.slice(1)}`,
+                `Your booking for property ${bookingId.substring(0, 8)} has been ${status} by the landlord.`,
+                status === 'confirmed' ? 'booking_approved' : 'booking_rejected',
+                bookingId
+            );
+
             alert(`Booking ${status} successfully.`);
         } catch (error) {
             alert('Failed to update booking status.');
@@ -64,69 +82,128 @@ const BookingManagement = () => {
         );
     };
 
-    if (loading) return <div>Loading booking requests...</div>;
+    if (loading) return (
+        <div className="card text-center py-8">
+            <div className="loading-spinner mb-2"></div>
+            <p className="text-light text-xs">Loading booking requests...</p>
+        </div>
+    );
 
     return (
-        <div className="card w-full">
-            <h3 className="mb-4">Booking Requests</h3>
+        <div className="card w-full shadow-sm">
+            <div className="flex justify-between items-center mb-6">
+                <h3 className="m-0">Booking Requests</h3>
+                <span className="text-[10px] bg-blue-100 text-blue-700 px-2 py-1 rounded fw-bold">NEWEST FIRST</span>
+            </div>
+
             {bookings.length === 0 ? (
-                <p className="text-light">You have no booking requests yet.</p>
+                <div className="text-center py-12">
+                    <Clock size={40} className="mx-auto text-light opacity-10 mb-3" />
+                    <p className="text-light m-0">You have no booking requests yet.</p>
+                </div>
             ) : (
                 <ul style={{ listStyle: 'none', padding: 0 }}>
-                    {bookings.map((booking) => (
-                        <li key={booking.id} style={{ padding: '1.5rem', borderBottom: '1px solid var(--border-color)', display: 'flex', flexWrap: 'wrap', gap: '1rem', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <div>
-                                <div className="flex items-center gap-2 mb-2">
-                                    <strong style={{ fontSize: '1.1rem' }}>Property ID: {booking.propertyId.substring(0, 8)}...</strong>
-                                    <span style={{
-                                        padding: '4px 8px', borderRadius: '12px', fontSize: '0.8rem', fontWeight: 'bold',
-                                        backgroundColor: booking.status === 'pending' ? '#FEF3C7' : booking.status === 'confirmed' ? '#D1FAE5' : '#FEE2E2',
-                                        color: booking.status === 'pending' ? '#B45309' : booking.status === 'confirmed' ? '#047857' : '#B91C1C'
-                                    }}>
-                                        {booking.status.toUpperCase()}
-                                    </span>
+                    {bookings.map((booking) => {
+                        const property = properties.find(p => p.id === booking.propertyId);
+                        return (
+                            <li key={booking.id} className="hover:bg-gray-50 transition-colors" style={{ padding: '1.25rem', borderBottom: '1px solid var(--border-color)', borderRadius: '8px' }}>
+                                <div className="flex gap-4 items-start mb-4">
+                                    <div style={{ width: '80px', height: '80px', borderRadius: '12px', overflow: 'hidden', backgroundColor: '#f3f4f6', flexShrink: 0 }}>
+                                        {property?.images && property.images[0] ? (
+                                            <img src={property.images[0]} alt={property.title} className="w-full h-full object-cover" />
+                                        ) : (
+                                            <div className="w-full h-full flex items-center justify-center text-light">
+                                                <Home size={24} />
+                                            </div>
+                                        )}
+                                    </div>
+                                    <div className="flex-grow">
+                                        <div className="flex justify-between items-start">
+                                            <div>
+                                                <h4 className="m-0 text-base">{property?.title || `Property: ${booking.propertyId.substring(0, 8)}`}</h4>
+                                                <p className="text-xs text-light mb-2">Ref: {booking.id.substring(0, 8).toUpperCase()}</p>
+                                            </div>
+                                            <span style={{
+                                                padding: '4px 10px', borderRadius: '50px', fontSize: '0.7rem', fontWeight: '700',
+                                                backgroundColor: booking.status === 'pending' ? '#FEF3C7' : booking.status === 'confirmed' ? '#D1FAE5' : '#FEE2E2',
+                                                color: booking.status === 'pending' ? '#B45309' : booking.status === 'confirmed' ? '#047857' : '#B91C1C'
+                                            }}>
+                                                {booking.status.toUpperCase()}
+                                            </span>
+                                        </div>
+                                        <div className="flex items-center gap-4 mt-1">
+                                            <div className="text-sm fw-bold">₦{Number(booking.amount).toLocaleString()}</div>
+                                            <button
+                                                className="flex items-center gap-1.5 text-xs text-primary fw-bold hover:underline"
+                                                onClick={() => setActiveChat({
+                                                    studentId: booking.studentId,
+                                                    propertyId: booking.propertyId,
+                                                    studentName: `Student ${booking.studentId.substring(0, 4)}`
+                                                })}
+                                            >
+                                                <MessageSquare size={14} /> Chat with Student
+                                            </button>
+                                        </div>
+                                    </div>
                                 </div>
-                                <p style={{ color: 'var(--text-light)', marginBottom: '0.5rem' }}>
-                                    Student ID: {booking.studentId.substring(0, 8)}...
-                                </p>
-                                <p><strong>Escrow Amount:</strong> ₦{Number(booking.amount).toLocaleString()}</p>
-                            </div>
 
-                            <div className="flex flex-col items-end gap-4" style={{ minWidth: '200px' }}>
                                 {booking.status === 'pending' && (
-                                    <>
-                                        <div className="flex items-center gap-2">
-                                            <Clock size={16} color="#F59E0B" /> {renderCountdown(booking.createdAt)}
+                                    <div className="flex flex-col sm:flex-row justify-between items-center gap-4 mt-2 p-3 bg-white rounded-lg border border-dashed">
+                                        <div className="flex items-center gap-2 text-xs">
+                                            <Clock size={14} className="text-amber-500" />
+                                            <span><strong>Expires in:</strong> {renderCountdown(booking.createdAt)}</span>
                                         </div>
-                                        <div className="flex gap-4 w-full">
+                                        <div className="flex gap-2 w-full sm:w-auto">
                                             <button
-                                                className="btn flex-1 flex justify-center items-center gap-2"
+                                                className="btn flex-1 flex justify-center items-center gap-2 text-xs py-2"
                                                 style={{ backgroundColor: '#10B981', color: 'white' }}
-                                                onClick={() => handleAction(booking.id, 'confirmed')}
+                                                onClick={() => handleAction(booking.id, 'confirmed', booking.studentId)}
                                             >
-                                                <CheckCircle size={16} /> Confirm
+                                                <CheckCircle size={14} /> Confirm
                                             </button>
                                             <button
-                                                className="btn flex-1 flex justify-center items-center gap-2"
+                                                className="btn flex-1 flex justify-center items-center gap-2 text-xs py-2"
                                                 style={{ backgroundColor: '#EF4444', color: 'white' }}
-                                                onClick={() => handleAction(booking.id, 'rejected')}
+                                                onClick={() => handleAction(booking.id, 'rejected', booking.studentId)}
                                             >
-                                                <XCircle size={16} /> Reject
+                                                <XCircle size={14} /> Reject
                                             </button>
                                         </div>
-                                    </>
+                                    </div>
                                 )}
-                                {booking.status === 'confirmed' && (
-                                    <p className="text-light" style={{ fontSize: '0.9rem' }}>Property Locked. Payment release scheduled 24-48h post move-in.</p>
-                                )}
-                                {booking.status === 'rejected' && (
-                                    <p className="text-light" style={{ fontSize: '0.9rem' }}>Refund automatically initiated to student.</p>
-                                )}
-                            </div>
-                        </li>
-                    ))}
+                            </li>
+                        );
+                    })}
                 </ul>
             )}
+
+            {/* Chat Modal Overlay */}
+            <AnimatePresence>
+                {activeChat && (
+                    <div className="modal-overlay" style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
+                        <motion.div
+                            className="bg-white w-full max-w-lg rounded-2xl shadow-2xl relative"
+                            initial={{ opacity: 0, scale: 0.9, y: 20 }}
+                            animate={{ opacity: 1, scale: 1, y: 0 }}
+                            exit={{ opacity: 0, scale: 0.9, y: 20 }}
+                        >
+                            <button
+                                className="absolute top-4 right-4 p-2 hover:bg-gray-100 rounded-full z-10"
+                                onClick={() => setActiveChat(null)}
+                            >
+                                <X size={20} />
+                            </button>
+                            <div className="p-2">
+                                <ChatComponent
+                                    receiverId={activeChat.studentId}
+                                    propertyId={activeChat.propertyId}
+                                    receiverName={activeChat.studentName}
+                                />
+                            </div>
+                        </motion.div>
+                    </div>
+                )}
+            </AnimatePresence>
         </div>
     );
 };

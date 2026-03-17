@@ -1,9 +1,32 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { Home } from 'lucide-react';
+import { Home, LogOut, User as UserIcon } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { getAuth, onAuthStateChanged, signOut } from 'firebase/auth';
+import { useNavigate } from 'react-router-dom';
+import NotificationDropdown from './NotificationDropdown';
 
 const Navbar = () => {
+    const [user, setUser] = React.useState(null);
+    const auth = getAuth();
+    const navigate = useNavigate();
+
+    React.useEffect(() => {
+        const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+            setUser(currentUser);
+        });
+        return () => unsubscribe();
+    }, [auth]);
+
+    const handleLogout = async () => {
+        try {
+            await signOut(auth);
+            navigate('/login');
+        } catch (error) {
+            console.error("Error signing out: ", error);
+        }
+    };
+
     return (
         <nav className="navbar-sticky">
             <div className="container flex justify-between items-center">
@@ -21,10 +44,23 @@ const Navbar = () => {
 
                 <div className="flex gap-8 items-center">
                     <Link to="/" className="nav-link">Home</Link>
-                    <div className="flex gap-4">
-                        <Link to="/login" className="btn btn-secondary" style={{ padding: '0.6rem 1.5rem' }}>Login</Link>
-                        <Link to="/signup" className="btn btn-primary" style={{ padding: '0.6rem 1.5rem' }}>Get Started</Link>
-                    </div>
+
+                    {user ? (
+                        <div className="flex items-center gap-6">
+                            <NotificationDropdown />
+                            <Link to="/settings" className="nav-link" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                <UserIcon size={20} /> Settings
+                            </Link>
+                            <button onClick={handleLogout} className="btn btn-secondary" style={{ padding: '0.5rem 1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                <LogOut size={16} /> Logout
+                            </button>
+                        </div>
+                    ) : (
+                        <div className="flex gap-4">
+                            <Link to="/login" className="btn btn-secondary" style={{ padding: '0.6rem 1.5rem' }}>Login</Link>
+                            <Link to="/signup" className="btn btn-primary" style={{ padding: '0.6rem 1.5rem' }}>Get Started</Link>
+                        </div>
+                    )}
                 </div>
             </div>
         </nav>
