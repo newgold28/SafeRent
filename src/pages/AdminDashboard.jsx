@@ -239,14 +239,26 @@ const AdminDashboard = () => {
                                         <MapPin size={14} className="text-primary" />
                                         <strong>GPS:</strong> {selectedLandlord.gpsLatitude}, {selectedLandlord.gpsLongitude}
                                     </div>
+                                    <div style={{ width: '100%', height: '150px', borderRadius: '8px', overflow: 'hidden', marginBottom: '1rem' }}>
+                                        <iframe
+                                            title="Landlord Location"
+                                            width="100%"
+                                            height="100%"
+                                            frameBorder="0"
+                                            scrolling="no"
+                                            marginHeight="0"
+                                            marginWidth="0"
+                                            src={`https://maps.google.com/maps?q=${selectedLandlord.gpsLatitude},${selectedLandlord.gpsLongitude}&z=15&output=embed`}
+                                        ></iframe>
+                                    </div>
                                     <a
                                         href={`https://www.google.com/maps?q=${selectedLandlord.gpsLatitude},${selectedLandlord.gpsLongitude}`}
                                         target="_blank"
                                         rel="noreferrer"
-                                        className="flex items-center gap-1 text-sm"
-                                        style={{ color: 'var(--primary-hover)', fontWeight: '700', textDecoration: 'none' }}
+                                        className="flex items-center gap-1 text-sm font-bold"
+                                        style={{ color: 'var(--primary-hover)', textDecoration: 'none' }}
                                     >
-                                        View on Map <ExternalLink size={12} />
+                                        Open in Full Google Maps <ExternalLink size={12} />
                                     </a>
                                 </div>
                             </div>
