@@ -6,6 +6,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import PropertyUpload from '../components/PropertyUpload';
 import BookingManagement from '../components/BookingManagement';
 import LandlordVerification from '../components/LandlordVerification';
+import Wallet from '../components/Wallet';
 
 const LandlordDashboard = () => {
     const [showUpload, setShowUpload] = useState(false);
@@ -13,6 +14,7 @@ const LandlordDashboard = () => {
     const [properties, setProperties] = useState([]);
     const [bookings, setBookings] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [activeTab, setActiveTab] = useState('overview'); // 'overview' or 'wallet'
 
     const auth = getAuth();
     const db = getFirestore();
@@ -181,6 +183,24 @@ const LandlordDashboard = () => {
                 </motion.button>
             </motion.div>
 
+            {/* Tab Navigation */}
+            <div className="flex gap-4 mb-8 border-bottom">
+                <button
+                    onClick={() => setActiveTab('overview')}
+                    className={`pb-4 px-2 text-sm fw-bold transition-all ${activeTab === 'overview' ? 'text-primary border-bottom-2 border-primary' : 'text-light border-bottom-2 border-transparent hover:text-dark'}`}
+                    style={{ borderBottomWidth: activeTab === 'overview' ? '3px' : '3px', borderBottomStyle: 'solid', background: 'none' }}
+                >
+                    Overview
+                </button>
+                <button
+                    onClick={() => setActiveTab('wallet')}
+                    className={`pb-4 px-2 text-sm fw-bold transition-all ${activeTab === 'wallet' ? 'text-primary border-bottom-2 border-primary' : 'text-light border-bottom-2 border-transparent hover:text-dark'}`}
+                    style={{ borderBottomWidth: activeTab === 'wallet' ? '3px' : '3px', borderBottomStyle: 'solid', background: 'none' }}
+                >
+                    Wallet & Earnings
+                </button>
+            </div>
+
             {/* Analytics Overview */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
                 <div className="card shadow-sm p-4 flex items-center gap-4">
@@ -210,7 +230,10 @@ const LandlordDashboard = () => {
                         <div className="text-2xl fw-bold">{stats.activeTenants}</div>
                     </div>
                 </div>
-                <div className="card shadow-sm p-4 flex items-center gap-4">
+                <div
+                    className="card shadow-sm p-4 flex items-center gap-4 cursor-pointer hover:shadow-md transition-all"
+                    onClick={() => setActiveTab('wallet')}
+                >
                     <div className="p-3 bg-amber-50 rounded-xl">
                         <DollarSign size={24} className="text-amber-600" />
                     </div>
@@ -235,74 +258,79 @@ const LandlordDashboard = () => {
                     </motion.div>
                 ) : (
                     <motion.div
-                        key="dashboard"
-                        className="flex gap-8"
-                        style={{ flexWrap: 'wrap' }}
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
+                        key={activeTab}
+                        className="flex flex-col gap-8"
+                        initial={{ opacity: 0, x: 20 }}
+                        animate={{ opacity: 1, x: 0 }}
                         transition={{ duration: 0.3 }}
                     >
-                        {/* Booking Requests */}
-                        <div style={{ flex: '1 1 400px' }}>
-                            <BookingManagement properties={properties} />
-                        </div>
+                        {activeTab === 'overview' ? (
+                            <div className="flex gap-8" style={{ flexWrap: 'wrap' }}>
+                                {/* Booking Requests */}
+                                <div style={{ flex: '1 1 400px' }}>
+                                    <BookingManagement properties={properties} />
+                                </div>
 
-                        <div className="card" style={{ flex: '2 1 500px' }}>
-                            <div className="flex justify-between items-center mb-6">
-                                <h3 className="m-0">My Properties</h3>
-                                <span className="text-xs text-light uppercase fw-bold tracking-wider">{properties.length} Listings</span>
-                            </div>
-                            <div className="flex flex-col gap-4">
-                                {properties.length === 0 ? (
-                                    <div className="text-center py-12 border-2 border-dashed rounded-xl">
-                                        <Home size={40} className="mx-auto text-light opacity-20 mb-3" />
-                                        <p className="text-light m-0">No properties uploaded yet.</p>
+                                <div className="card" style={{ flex: '2 1 500px' }}>
+                                    <div className="flex justify-between items-center mb-6">
+                                        <h3 className="m-0">My Properties</h3>
+                                        <span className="text-xs text-light uppercase fw-bold tracking-wider">{properties.length} Listings</span>
                                     </div>
-                                ) : (
-                                    properties.map(prop => (
-                                        <div key={prop.id} className="card shadow-none hover:bg-gray-50 transition-colors cursor-pointer" style={{ border: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem' }}>
-                                            <div className="flex items-center gap-4">
-                                                <div style={{ width: '60px', height: '60px', borderRadius: '8px', overflow: 'hidden', backgroundColor: '#f3f4f6' }}>
-                                                    {prop.images && prop.images[0] ? (
-                                                        <img src={prop.images[0]} alt={prop.title} className="w-full h-full object-cover" />
-                                                    ) : (
-                                                        <div className="w-full h-full flex items-center justify-center text-light">
-                                                            <Home size={20} />
+                                    <div className="flex flex-col gap-4">
+                                        {properties.length === 0 ? (
+                                            <div className="text-center py-12 border-2 border-dashed rounded-xl">
+                                                <Home size={40} className="mx-auto text-light opacity-20 mb-3" />
+                                                <p className="text-light m-0">No properties uploaded yet.</p>
+                                            </div>
+                                        ) : (
+                                            properties.map(prop => (
+                                                <div key={prop.id} className="card shadow-none hover:bg-gray-50 transition-colors cursor-pointer" style={{ border: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem' }}>
+                                                    <div className="flex items-center gap-4">
+                                                        <div style={{ width: '60px', height: '60px', borderRadius: '8px', overflow: 'hidden', backgroundColor: '#f3f4f6' }}>
+                                                            {prop.images && prop.images[0] ? (
+                                                                <img src={prop.images[0]} alt={prop.title} className="w-full h-full object-cover" />
+                                                            ) : (
+                                                                <div className="w-full h-full flex items-center justify-center text-light">
+                                                                    <Home size={20} />
+                                                                </div>
+                                                            )}
                                                         </div>
-                                                    )}
+                                                        <div>
+                                                            <strong style={{ display: 'block', fontSize: '1rem' }}>{prop.title}</strong>
+                                                            <span className="text-xs text-light flex items-center gap-1">
+                                                                <MapPin size={12} /> {prop.location}
+                                                            </span>
+                                                        </div>
+                                                    </div>
+                                                    <div className="flex flex-col items-end gap-1">
+                                                        <div style={{
+                                                            color: prop.approvalStatus === 'approved' ? '#059669' : '#D97706',
+                                                            fontWeight: 'bold',
+                                                            fontSize: '0.75rem',
+                                                            backgroundColor: prop.approvalStatus === 'approved' ? '#ECFDF5' : '#FFFBEB',
+                                                            padding: '0.25rem 0.65rem',
+                                                            borderRadius: '50px',
+                                                            textTransform: 'uppercase'
+                                                        }}>
+                                                            {prop.approvalStatus || 'Pending'}
+                                                        </div>
+                                                        <div className="text-[10px] fw-bold text-light uppercase">
+                                                            ₦{Number(prop.price).toLocaleString()} / yr
+                                                        </div>
+                                                    </div>
                                                 </div>
-                                                <div>
-                                                    <strong style={{ display: 'block', fontSize: '1rem' }}>{prop.title}</strong>
-                                                    <span className="text-xs text-light flex items-center gap-1">
-                                                        <MapPin size={12} /> {prop.location}
-                                                    </span>
-                                                </div>
-                                            </div>
-                                            <div className="flex flex-col items-end gap-1">
-                                                <div style={{
-                                                    color: prop.approvalStatus === 'approved' ? '#059669' : '#D97706',
-                                                    fontWeight: 'bold',
-                                                    fontSize: '0.75rem',
-                                                    backgroundColor: prop.approvalStatus === 'approved' ? '#ECFDF5' : '#FFFBEB',
-                                                    padding: '0.25rem 0.65rem',
-                                                    borderRadius: '50px',
-                                                    textTransform: 'uppercase'
-                                                }}>
-                                                    {prop.approvalStatus || 'Pending'}
-                                                </div>
-                                                <div className="text-[10px] fw-bold text-light uppercase">
-                                                    ₦{Number(prop.price).toLocaleString()} / yr
-                                                </div>
-                                            </div>
-                                        </div>
-                                    ))
-                                )}
+                                            ))
+                                        )}
+                                    </div>
+                                </div>
                             </div>
-                        </div>
+                        ) : (
+                            <Wallet />
+                        )}
                     </motion.div>
                 )}
             </AnimatePresence>
-        </div>
+        </div >
     );
 };
 

@@ -143,9 +143,23 @@ export const bookingService = {
     updateBookingStatus: async (bookingId, newStatus) => {
         try {
             const bookingRef = doc(db, 'bookings', bookingId);
+            const bookingSnap = await getDoc(bookingRef);
+
+            if (!bookingSnap.exists()) throw new Error("Booking not found");
+            const bookingData = bookingSnap.data();
+
             await setDoc(bookingRef, { status: newStatus }, { merge: true });
 
-            // Note: If confirmed, you would also need to update the property status to 'locked' or 'rented' here
+            // If confirmed, update wallet (add to pending escrow)
+            if (newStatus === 'confirmed') {
+                const walletRef = doc(db, 'wallets', bookingData.landlordId);
+                const walletSnap = await getDoc(walletRef);
+                const currentPending = walletSnap.exists() ? walletSnap.data().pendingEscrow || 0 : 0;
+
+                await setDoc(walletRef, {
+                    pendingEscrow: currentPending + Number(bookingData.amount)
+                }, { merge: true });
+            }
         } catch (error) {
             console.error("Error updating booking status", error);
             throw error;
@@ -233,6 +247,74 @@ export const chatService = {
         } catch (error) {
             console.error("Error updating landlord status", error);
             throw error;
+        }
+    }
+};
+
+export const walletService = {
+    // Get/Listen to wallet data
+    getWallet: (landlordId, callback) => {
+        const walletRef = doc(db, 'wallets', landlordId);
+        return onSnapshot(walletRef, (snapshot) => {
+            if (snapshot.exists()) {
+                callback(snapshot.data());
+            } else {
+                // Initialize wallet if it doesn't exist
+                setDoc(walletRef, {
+                    availableBalance: 0,
+                    pendingEscrow: 0,
+                    totalEarned: 0,
+                    withdrawals: []
+                });
+                callback({ availableBalance: 0, pendingEscrow: 0, totalEarned: 0, withdrawals: [] });
+            }
+        });
+    },
+
+    // Request a withdrawal
+    requestWithdrawal: async (landlordId, amount, bankDetails) => {
+        try {
+            const walletRef = doc(db, 'wallets', landlordId);
+            const walletSnap = await getDoc(walletRef);
+
+            if (!walletSnap.exists() || walletSnap.data().availableBalance < amount) {
+                throw new Error("Insufficient balance");
+            }
+
+            const withdrawal = {
+                id: `WD-${Date.now()}`,
+                amount,
+                bankDetails,
+                status: 'pending',
+                timestamp: new Date().toISOString()
+            };
+
+            await setDoc(walletRef, {
+                availableBalance: walletSnap.data().availableBalance - amount,
+                withdrawals: [withdrawal, ...(walletSnap.data().withdrawals || [])]
+            }, { merge: true });
+
+            return withdrawal.id;
+        } catch (error) {
+            console.error("Withdrawal request failed", error);
+            throw error;
+        }
+    },
+
+    // Internal: Release escrow funds to available balance
+    releaseEscrow: async (landlordId, amount) => {
+        try {
+            const walletRef = doc(db, 'wallets', landlordId);
+            const walletSnap = await getDoc(walletRef);
+            const data = walletSnap.data() || { availableBalance: 0, pendingEscrow: 0, totalEarned: 0 };
+
+            await setDoc(walletRef, {
+                availableBalance: data.availableBalance + amount,
+                pendingEscrow: Math.max(0, data.pendingEscrow - amount),
+                totalEarned: data.totalEarned + amount
+            }, { merge: true });
+        } catch (error) {
+            console.error("Escrow release failed", error);
         }
     }
 };

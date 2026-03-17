@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Clock, BookOpen, Users, Star, ArrowRight, Home } from 'lucide-react';
 import { getAuth, onAuthStateChanged } from 'firebase/auth';
-import { getFirestore, doc, onSnapshot, collection, query, where } from 'firebase/firestore';
+import { getFirestore, doc, onSnapshot, collection, query, where, updateDoc } from 'firebase/firestore';
+import { walletService } from '../services/firebase';
 import PropertyListings from '../components/PropertyListings';
 import StudentBookings from '../components/StudentBookings';
 import RoommateFinderWidget from '../components/RoommateFinderWidget';
@@ -76,6 +77,27 @@ const StudentDashboard = () => {
         return diffDays > 0 ? diffDays : 0;
     };
 
+    const handleConfirmMoveIn = async () => {
+        if (!activeBooking) return;
+
+        const confirm = window.confirm("By confirming move-in, you release the escrowed funds to the landlord. Continue?");
+        if (!confirm) return;
+
+        try {
+            // 1. Release Escrow
+            await walletService.releaseEscrow(activeBooking.landlordId, Number(activeBooking.amount));
+
+            // 2. Mark booking as completed
+            const bookingRef = doc(db, 'bookings', activeBooking.id);
+            await updateDoc(bookingRef, { status: 'completed' });
+
+            alert("Move-in confirmed! Funds have been released to the landlord.");
+        } catch (error) {
+            console.error("Error confirming move-in:", error);
+            alert("Failed to confirm move-in.");
+        }
+    };
+
     if (loading) {
         return (
             <div className="container section text-center" style={{ minHeight: '60vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -125,8 +147,17 @@ const StudentDashboard = () => {
                                 <p style={{ margin: 0, fontSize: '1rem', fontWeight: 600 }}>
                                     To your stay at <span className="text-primary">Property {activeBooking.propertyId.substring(0, 8)}</span>
                                 </p>
-                                <div className="mt-6 flex items-center gap-2 text-sm fw-800 cursor-pointer hover:gap-3 transition-all">
-                                    View Move-in Package <ArrowRight size={16} />
+                                <div className="mt-6 flex flex-col gap-3">
+                                    <button
+                                        onClick={handleConfirmMoveIn}
+                                        className="btn btn-primary w-full py-2 shadow-md hover:bg-primary-hover"
+                                        style={{ backgroundColor: 'white', color: 'var(--primary-color)', border: '1px solid var(--primary-color)' }}
+                                    >
+                                        I Have Moved In
+                                    </button>
+                                    <div className="flex items-center gap-2 text-xs fw-800 cursor-pointer hover:gap-3 transition-all opacity-70">
+                                        View Move-in Package <ArrowRight size={14} />
+                                    </div>
                                 </div>
                             </motion.div>
                         ) : (
