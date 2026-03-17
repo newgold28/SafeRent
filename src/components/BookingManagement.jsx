@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { getFirestore, collection, query, where, onSnapshot, orderBy } from 'firebase/firestore';
-import { bookingService } from '../services/firebase';
+import { bookingService, chatService } from '../services/firebase';
 import { getAuth } from 'firebase/auth';
+import { useNavigate } from 'react-router-dom';
 import { Clock, CheckCircle, XCircle, MessageSquare, X, Home } from 'lucide-react';
 import { createNotification } from '../services/notifications';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -10,7 +11,7 @@ import ChatComponent from './ChatComponent';
 const BookingManagement = ({ properties = [] }) => {
     const [bookings, setBookings] = useState([]);
     const [loading, setLoading] = useState(true);
-    const [activeChat, setActiveChat] = useState(null); // { studentId, propertyId, studentName }
+    const navigate = useNavigate();
     const auth = getAuth();
     const db = getFirestore();
 
@@ -131,19 +132,20 @@ const BookingManagement = ({ properties = [] }) => {
                                                 {booking.status.toUpperCase()}
                                             </span>
                                         </div>
-                                        <div className="flex items-center gap-4 mt-1">
-                                            <div className="text-sm fw-bold">₦{Number(booking.amount).toLocaleString()}</div>
-                                            <button
-                                                className="flex items-center gap-1.5 text-xs text-primary fw-bold hover:underline"
-                                                onClick={() => setActiveChat({
-                                                    studentId: booking.studentId,
-                                                    propertyId: booking.propertyId,
-                                                    studentName: `Student ${booking.studentId.substring(0, 4)}`
-                                                })}
-                                            >
-                                                <MessageSquare size={14} /> Chat with Student
-                                            </button>
-                                        </div>
+                                        <div className="text-sm fw-bold">₦{Number(booking.amount).toLocaleString()}</div>
+                                        <button
+                                            className="flex items-center gap-1.5 text-xs text-primary fw-bold hover:underline"
+                                            onClick={async () => {
+                                                try {
+                                                    await chatService.initiateConversation(auth.currentUser.uid, booking.studentId);
+                                                    navigate('/inbox');
+                                                } catch (error) {
+                                                    console.error("Error starting chat:", error);
+                                                }
+                                            }}
+                                        >
+                                            <MessageSquare size={14} /> Chat with Student
+                                        </button>
                                     </div>
                                 </div>
 
@@ -177,33 +179,7 @@ const BookingManagement = ({ properties = [] }) => {
                 </ul>
             )}
 
-            {/* Chat Modal Overlay */}
-            <AnimatePresence>
-                {activeChat && (
-                    <div className="modal-overlay" style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
-                        <motion.div
-                            className="bg-white w-full max-w-lg rounded-2xl shadow-2xl relative"
-                            initial={{ opacity: 0, scale: 0.9, y: 20 }}
-                            animate={{ opacity: 1, scale: 1, y: 0 }}
-                            exit={{ opacity: 0, scale: 0.9, y: 20 }}
-                        >
-                            <button
-                                className="absolute top-4 right-4 p-2 hover:bg-gray-100 rounded-full z-10"
-                                onClick={() => setActiveChat(null)}
-                            >
-                                <X size={20} />
-                            </button>
-                            <div className="p-2">
-                                <ChatComponent
-                                    receiverId={activeChat.studentId}
-                                    propertyId={activeChat.propertyId}
-                                    receiverName={activeChat.studentName}
-                                />
-                            </div>
-                        </motion.div>
-                    </div>
-                )}
-            </AnimatePresence>
+            {/* Chat Modal Removed for Centralized Inbox */}
         </div>
     );
 };

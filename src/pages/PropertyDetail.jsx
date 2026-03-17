@@ -10,7 +10,7 @@ import {
 } from 'lucide-react';
 import PaystackPayment from '../components/PaystackPayment';
 import { paystackEscrow } from '../services/paystack';
-import { bookingService } from '../services/firebase';
+import { bookingService, chatService } from '../services/firebase';
 
 const PropertyDetail = () => {
     const { id } = useParams();
@@ -62,6 +62,19 @@ const PropertyDetail = () => {
 
     const prevImage = () => {
         setActiveImage((prev) => (prev === 0 ? property.images.length - 1 : prev - 1));
+    };
+
+    const handleChat = async () => {
+        if (!auth.currentUser) {
+            navigate('/login');
+            return;
+        }
+        try {
+            await chatService.initiateConversation(auth.currentUser.uid, property.landlordId);
+            navigate('/inbox');
+        } catch (error) {
+            console.error("Error starting chat:", error);
+        }
     };
 
     return (
@@ -283,7 +296,10 @@ const PropertyDetail = () => {
                         </div>
 
                         <div className="flex flex-col gap-3">
-                            <button className="btn btn-secondary w-full flex items-center justify-center gap-2 py-3">
+                            <button
+                                onClick={handleChat}
+                                className="btn btn-secondary w-full flex items-center justify-center gap-2 py-3"
+                            >
                                 <MessageSquare size={18} /> Chat with Landlord
                             </button>
                             <p className="text-xs text-light text-center m-0">

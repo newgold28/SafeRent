@@ -175,18 +175,48 @@ export const roommateService = {
 
 export const chatService = {
     // Send a message
-    sendMessage: async (senderId, receiverId, propertyId, text) => {
+    sendMessage: async (senderId, receiverId, conversationId, text) => {
         try {
-            const messagesRef = collection(db, 'messages');
+            const messagesRef = collection(db, `conversations/${conversationId}/messages`);
             await addDoc(messagesRef, {
                 senderId,
                 receiverId,
-                propertyId,
                 text,
                 timestamp: new Date().toISOString()
             });
+
+            // Update conversation metadata
+            const convRef = doc(db, 'conversations', conversationId);
+            await setDoc(convRef, {
+                lastMessage: text,
+                lastMessageTime: new Date().toISOString(),
+                participants: [senderId, receiverId]
+            }, { merge: true });
         } catch (error) {
             console.error("Error sending message", error);
+            throw error;
+        }
+    },
+
+    // New: Initiate or get a conversation ID between two users
+    initiateConversation: async (user1, user2) => {
+        try {
+            const conversationsRef = collection(db, 'conversations');
+            const conversationId = [user1, user2].sort().join('_');
+            const convRef = doc(db, 'conversations', conversationId);
+            const convSnap = await getDoc(convRef);
+
+            if (!convSnap.exists()) {
+                await setDoc(convRef, {
+                    participants: [user1, user2],
+                    createdAt: new Date().toISOString(),
+                    lastMessage: 'Conversation started',
+                    lastMessageTime: new Date().toISOString()
+                });
+            }
+            return conversationId;
+        } catch (error) {
+            console.error("Error initiating conversation", error);
             throw error;
         }
     },

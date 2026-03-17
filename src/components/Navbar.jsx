@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { Home, LogOut, User as UserIcon } from 'lucide-react';
+import { Home, LogOut, User as UserIcon, MessageSquare } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { getAuth, onAuthStateChanged, signOut } from 'firebase/auth';
 import { useNavigate } from 'react-router-dom';
@@ -48,6 +48,9 @@ const Navbar = () => {
                     {user ? (
                         <div className="flex items-center gap-6">
                             <NotificationDropdown />
+                            <Link to="/inbox" className="nav-link" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                <MessageSquare size={20} /> Messages
+                            </Link>
                             <Link to="/settings" className="nav-link" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                                 <UserIcon size={20} /> Settings
                             </Link>
