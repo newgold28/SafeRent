@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { getFirestore, collection, onSnapshot, query, where, doc, updateDoc, getDocs } from 'firebase/firestore';
 import { CheckCircle, XCircle, User, Home, MapPin, Video, Eye, ExternalLink, Shield } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { createNotification } from '../services/notifications';
 
 const AdminDashboard = () => {
     const [pendingLandlords, setPendingLandlords] = useState([]);
@@ -56,6 +57,25 @@ const AdminDashboard = () => {
             }
 
             if (selectedLandlord?.id === id) setSelectedLandlord(null);
+
+            // Send real-time notification
+            if (type === 'landlord') {
+                const title = status === 'approved' ? 'Account Verified! ✨' : 'Verification Update';
+                const message = status === 'approved'
+                    ? 'Congratulations! Your identity has been verified. You can now start listing properties and accepting bookings.'
+                    : 'Your verification request could not be approved at this time. Please ensure your documents and video are clear and try again.';
+                await createNotification(id, title, message, 'verification_status', id);
+            } else if (type === 'property') {
+                const prop = pendingProperties.find(p => p.id === id);
+                if (prop) {
+                    const title = status === 'approved' ? 'Property Live! 🏠' : 'Property Listing Update';
+                    const message = status === 'approved'
+                        ? `Great news! Your property "${prop.title}" has been approved and is now visible to students.`
+                        : `Your property listing "${prop.title}" was not approved. Please review the listing details and try again.`;
+                    await createNotification(prop.landlordId, title, message, 'property_approval', id);
+                }
+            }
+
             alert(`${type.charAt(0).toUpperCase() + type.slice(1)} ${status}!`);
         } catch (err) {
             console.error("Action error:", err);
