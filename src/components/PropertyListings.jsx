@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
 import { getFirestore, collection, onSnapshot, query, orderBy } from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
+import { useNavigate } from 'react-router-dom';
 import { bookingService } from '../services/firebase';
 import { paystackEscrow } from '../services/paystack';
 import PaystackPayment from './PaystackPayment';
@@ -8,6 +8,7 @@ import { MapPin, Home, Tag, Video } from 'lucide-react';
 
 const PropertyListings = () => {
     const auth = getAuth();
+    const navigate = useNavigate();
     const [properties, setProperties] = useState([]);
     const [loading, setLoading] = useState(true);
     const [showAdvanced, setShowAdvanced] = useState(false);
@@ -227,7 +228,12 @@ const PropertyListings = () => {
                     </div>
                 ) : (
                     sortedAndFilteredProperties.map((prop) => (
-                        <div key={prop.id} className="card property-card group" style={{ padding: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+                        <div
+                            key={prop.id}
+                            className="card property-card group cursor-pointer"
+                            style={{ padding: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}
+                            onClick={() => navigate(`/property/${prop.id}`)}
+                        >
 
                             {/* Image Section */}
                             <div style={{ height: '220px', backgroundColor: '#f3f4f6', position: 'relative', overflow: 'hidden' }}>
@@ -246,9 +252,9 @@ const PropertyListings = () => {
                                 <div className="absolute top-4 right-4 bg-white/90 backdrop-blur-sm text-dark px-3 py-1.5 rounded-full text-sm fw-bold shadow-sm">
                                     ₦{Number(prop.price).toLocaleString()} / yr
                                 </div>
-                                {prop.isVerfied && (
+                                {prop.landlordVerified && (
                                     <div className="absolute top-4 left-4 bg-primary text-dark px-2 py-1 rounded-md text-[10px] fw-bold shadow-sm flex items-center gap-1">
-                                        <ShieldCheck size={12} /> VERIFIED
+                                        <ShieldCheck size={12} /> ID & LOCATION VERIFIED
                                     </div>
                                 )}
                             </div>
@@ -256,7 +262,7 @@ const PropertyListings = () => {
                             {/* Property Details */}
                             <div className="p-5 flex-grow flex flex-col">
                                 <div className="flex justify-between items-start mb-2">
-                                    <h3 className="m-0 text-lg hover:text-primary transition-colors cursor-pointer">{prop.title}</h3>
+                                    <h3 className="m-0 text-lg group-hover:text-primary transition-colors">{prop.title}</h3>
                                     <span className="text-[10px] bg-gray-100 text-gray-600 px-2 py-1 rounded uppercase fw-bold tracking-wider">
                                         {prop.type}
                                     </span>
@@ -280,44 +286,13 @@ const PropertyListings = () => {
                                     </div>
                                 )}
 
-                                <p className="text-sm line-clamp-2 mb-6 text-gray-600 leading-relaxed">
+                                <p className="text-sm line-clamp-2 text-gray-600 leading-relaxed mb-4">
                                     {prop.description}
                                 </p>
 
-                                <div className="mt-auto">
-                                    {!auth.currentUser ? (
-                                        <button
-                                            className="btn btn-secondary w-full"
-                                            onClick={() => alert("Please login as a student to book properties.")}
-                                        >
-                                            Login to Book
-                                        </button>
-                                    ) : (
-                                        <PaystackPayment
-                                            amount={prop.price}
-                                            email={auth.currentUser.email}
-                                            metadata={paystackEscrow.generateMetadata(prop.id, auth.currentUser.uid, prop.landlordId)}
-                                            onSuccess={async (reference) => {
-                                                try {
-                                                    await bookingService.requestBooking(
-                                                        prop.id,
-                                                        prop.landlordId,
-                                                        auth.currentUser.uid,
-                                                        prop.price,
-                                                        reference.reference
-                                                    );
-                                                    alert(`Payment Successful! Reference: ${reference.reference}. Your booking request has been sent.`);
-                                                } catch (error) {
-                                                    console.error("Booking failed after payment", error);
-                                                    alert("Payment was successful but booking registration failed. Please contact support.");
-                                                }
-                                            }}
-                                            onClose={() => {
-                                                console.log("Payment window closed");
-                                            }}
-                                            btnText="Secure This Home"
-                                        />
-                                    )}
+                                <div className="mt-auto pt-4 border-top flex justify-between items-center bg-transparent">
+                                    <span className="text-xs fw-bold text-primary group-hover:underline">View Full Details →</span>
+                                    <Tag size={14} className="text-light opacity-30" />
                                 </div>
                             </div>
                         </div>
